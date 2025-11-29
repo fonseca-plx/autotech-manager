@@ -1,26 +1,23 @@
 from rest_framework import serializers
 from .models import Usuario
+from django.contrib.auth.password_validation import validate_password
 
 class UsuarioRegistroSerializer(serializers.ModelSerializer):
+    senha = serializers.CharField(write_only=True, validators=[validate_password])
+
     class Meta:
         model = Usuario
-        fields = ['username', 'email', 'tipo_perfil', 'password']
-        extra_kwargs = {'password': {'write_only': True}}
+        fields = ['email', 'cpf', 'telefone', 'tipo_perfil', 'senha']
 
     def create(self, validated_data):
-        user = Usuario.objects.create_user(
-            username=validated_data['username'],
-            email=validated_data['email'],
-            tipo_perfil=validated_data['tipo_perfil'],
-            password=validated_data['password']
-        )
-        return user
-
-class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True)
+        senha = validated_data.pop('senha')
+        usuario = Usuario(**validated_data)
+        usuario.set_password(senha)
+        usuario.save()
+        return usuario
 
 class UsuarioPerfilSerializer(serializers.ModelSerializer):
     class Meta:
         model = Usuario
-        fields = ['id', 'username', 'email', 'cpf', 'telefone', 'tipo_perfil', 'data_cadastro', 'ativo']
+        fields = ['email', 'cpf', 'telefone', 'tipo_perfil', 'data_cadastro', 'ativo']
+        read_only_fields = ['email', 'cpf', 'data_cadastro']

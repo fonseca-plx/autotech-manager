@@ -1,38 +1,56 @@
-from django.shortcuts import render
 from rest_framework.views import APIView
-from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from django.contrib.auth import authenticate, login
-from rest_framework.authtoken.models import Token
-from rest_framework.authtoken.views import ObtainAuthToken
-from .serializers import RegistroUsuarioSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate
 
-# Create your views here.
+from .models import Usuario
+from .serializers import UsuarioRegistroSerializer, UsuarioPerfilSerializer
 
-class RegistroUsuarioView(APIView):
-    permission_classes = [permissions.AllowAny]
+class RegistroView(APIView):
+    def post(self, request):
+        serializer = UsuarioRegistroSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"mensagem": "Usuário criado com sucesso!"}, status=201)
+
+class LoginView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        senha = request.data.get("senha")
+        usuario = authenticate(username=email, password=senha)
+
+        if usuario is None:
+            return Response({"erro": "Credenciais inválidas"}, status=400)
+
+        refresh = RefreshToken.for_user(usuario)
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "perfil": usuario.tipo_perfil
+        })
+
+class LogoutView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        serializer = RegistroUsuarioSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-class LoginUsuarioView(ObtainAuthToken):
-    permission_classes = [permissions.AllowAny]
+        try:
+            refresh_token = request.data["refresh"]
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response({"mensagem": "Logout realizado com sucesso"})
+        except Exception:
+            return Response({"erro": "Token inválido"}, status=400)
 
-    def post(self, request):
-        email = request.data.get('email')
-        password = request.data.get('password')
+class PerfilView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
-        usuario = authenticate(request, email=email, password=password)
-        if usuario is not None:
-            login(request, usuario)
-            token, created = Token.objects.get_or_create(user=usuario)
-            if created:
-                token.delete()  # Ensure a new token is created each login
-                token = Token.objects.create(user=usuario)
-            return Response({"token": token.key, "email": usuario.email, "perfil": usuario.perfil}, status=status.HTTP_200_OK)
-        return Response({"message": "Login ou senha inválidos"}, status=status.HTTP_401_UNAUTHORIZED)
+    def get(self, request):
+        serializer = UsuarioPerfilSerializer(request.user)
+        return Response(serializer.data)
+
+    def put(self, request):
+        serializer = UsuarioPerfilSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

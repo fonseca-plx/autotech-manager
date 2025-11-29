@@ -9,6 +9,7 @@ class Usuario(AbstractUser):
         ('mecanico', 'MECANICO'),
         ('cliente', 'CLIENTE'),
     )
+    username = None
     email = models.EmailField(unique=True)
     cpf = models.CharField(max_length=11, unique=True)
     telefone = models.CharField(max_length=15, blank=True, null=True)
@@ -17,7 +18,7 @@ class Usuario(AbstractUser):
     ativo = models.BooleanField(default=True)
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']
+    REQUIRED_FIELDS = ['cpf', 'tipo_perfil']
 
     def __str__(self):
-        return self.email
+        return f"{self.email} - {self.tipo_perfil}"
